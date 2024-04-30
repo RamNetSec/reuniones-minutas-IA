@@ -14,7 +14,7 @@ Antes de poder ejecutar el script, necesitas instalar algunas dependencias:
 
 ```bash
 pip install openai
-
+```
 # Transcriptor de Audio Automático
 
 Este proyecto proporciona una herramienta automatizada para transcribir archivos de audio en una carpeta especificada utilizando la API de OpenAI's Whisper. La herramienta también utiliza un sistema de caché para mejorar la eficiencia al evitar la transcripción repetida de los mismos archivos.
@@ -32,3 +32,4 @@ Antes de ejecutar el script, necesitas instalar algunas dependencias:
 
 ```bash
 pip install requests tqdm argparse openai logging pickle math json
+```
