@@ -1,35 +1,64 @@
-# Generador de Minutas de Reuniones
+# Video Transcription Script
 
-Este proyecto proporciona una herramienta para crear minutas estructuradas de reuniones a partir de transcripciones de texto, utilizando la API de OpenAI. Está diseñado para facilitar la síntesis de conversaciones grabadas en reuniones y convertirlas en un formato legible y estructurado.
+Este script automatiza la transcripción de videos utilizando el modelo Whisper de OpenAI y distribuye la carga de trabajo en múltiples GPUs disponibles. 
 
-## Características
+## Descripción
 
-- **Automatización completa**: Genera minutas a partir de transcripciones con un simple comando.
-- **Personalizable**: Fácil de adaptar para diferentes formatos y detalles de minutas.
-- **Soporte de múltiples idiomas**: Capacidad de generar minutas en varios idiomas (dependiendo de la configuración de la API de OpenAI utilizada).
+El script realiza las siguientes acciones:
 
-## Instalación
+1. Comprueba la existencia de comandos necesarios.
+2. Actualiza y mejora el sistema.
+3. Instala herramientas necesarias (bashtop, nvtop, ffmpeg, unzip, python3-venv).
+4. Crea y activa un entorno virtual de Python.
+5. Instala bibliotecas de Python necesarias (gdown, openai-whisper).
+6. Crea y se mueve al directorio de entrada especificado.
+7. Descarga archivos de video desde una URL especificada.
+8. Descarga el modelo Whisper antes de usarlo.
+9. Crea las carpetas de salida si no existen.
+10. Cuenta el número de GPUs disponibles.
+11. Distribuye el procesamiento de archivos de video entre las GPUs disponibles.
+12. Realiza la transcripción de los videos y guarda los resultados en las carpetas de salida especificadas.
 
-Antes de poder ejecutar el script, necesitas instalar algunas dependencias:
+## Uso
 
-```bash
-pip install openai
-```
-# Transcriptor de Audio Automático
+### Prerrequisitos
 
-Este proyecto proporciona una herramienta automatizada para transcribir archivos de audio en una carpeta especificada utilizando la API de OpenAI's Whisper. La herramienta también utiliza un sistema de caché para mejorar la eficiencia al evitar la transcripción repetida de los mismos archivos.
+Asegúrate de tener los siguientes comandos instalados en tu sistema:
 
-## Características
+- `apt`
+- `pip3`
+- `gdown`
+- `whisper`
+- `nvidia-smi`
 
-- **Transcripción Automática**: Convierte automáticamente los archivos de audio a texto.
-- **Caching**: Guarda transcripciones previas para mejorar la eficiencia en futuras ejecuciones.
-- **Barra de Progreso**: Muestra el progreso de la transcripción de los archivos usando `tqdm`.
-- **Logging**: Registra todos los pasos importantes del proceso para facilitar la depuración.
+### Instrucciones
 
-## Requisitos
+1. Clona el repositorio a tu máquina local:
 
-Antes de ejecutar el script, necesitas instalar algunas dependencias:
+    ```sh
+    git clone https://github.com/tuusuario/nombre-repositorio.git
+    cd nombre-repositorio
+    ```
 
-```bash
-pip install requests tqdm argparse openai logging pickle math json
-```
+2. Haz que el script sea ejecutable:
+
+    ```sh
+    chmod +x minutas.sh
+    ```
+
+3. Ejecuta el script con los argumentos necesarios:
+
+    ```sh
+    ./minutas.sh -i <input_dir> -o <output_dir> -m <model_size> -l <language> -t <temperature>
+    ```
+
+    - `-i <input_dir>`: Directorio que contiene los archivos de video (default: `videos`).
+    - `-o <output_dir>`: Directorio donde se guardarán las transcripciones (default: `output`).
+    - `-m <model_size>`: Tamaño del modelo Whisper a usar (default: `medium`).
+    - `-l <language>`: Idioma para la transcripción (default: `Spanish`).
+    - `-t <temperature>`: Temperatura para la transcripción (default: `0.7`).
+
+### Ejemplo de Uso
+
+```sh
+./minutas.sh -i videos -o output -m large -l English -t 0.8
