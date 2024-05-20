@@ -1,3 +1,4 @@
+
 # Video Transcription Script
 
 Este script automatiza la transcripción de videos utilizando el modelo Whisper de OpenAI y distribuye la carga de trabajo en múltiples GPUs disponibles. 
@@ -62,3 +63,16 @@ Asegúrate de tener los siguientes comandos instalados en tu sistema:
 
 ```sh
 ./minutas.sh -i videos -o output -m large -l English -t 0.8
+```
+
+Este comando procesará los archivos de video en el directorio `videos`, guardará las transcripciones en el directorio `output`, usará el modelo Whisper `large`, transcribirá en inglés y utilizará una temperatura de `0.8`.
+
+## Notas
+
+- Asegúrate de que las GPUs estén disponibles y correctamente configuradas en tu sistema.
+- El script crea y utiliza un entorno virtual de Python para asegurar que las dependencias necesarias estén aisladas y no interfieran con otras configuraciones de Python en tu sistema.
+
+## Contribución
+
+Las contribuciones son bienvenidas. Por favor, envía un pull request o abre un issue para discutir los cambios que deseas realizar.
+
