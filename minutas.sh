@@ -6,12 +6,13 @@ trap "echo 'Error: Script falló en la línea $LINENO'; exit 1" ERR
 
 # Función para mostrar el uso del script
 usage() {
-    echo "Uso: $0 [-i input_dir] [-o output_dir] [-m model_size] [-l language] [-t temperature] [-h]"
+    echo "Uso: $0 [-i input_dir] [-o output_dir] [-m model_size] [-l language] [-t temperature] [-d download_id] [-h]"
     echo "  -i input_dir    Directorio que contiene los archivos de video (default: videos)"
     echo "  -o output_dir   Directorio donde se guardarán las transcripciones (default: output)"
     echo "  -m model_size   Tamaño del modelo Whisper a usar (default: medium)"
     echo "  -l language     Idioma para la transcripción (default: Spanish)"
-    echo "  -t temperature  Temperatura para la transcripción (default: 0.7)"
+    echo "  -t temperature  Temperatura para la transcripción (default: 0.2)"
+    echo "  -d download_id  ID del archivo o carpeta para descargar los videos"
     echo "  -h              Mostrar esta ayuda"
     exit 1
 }
@@ -21,10 +22,7 @@ input_dir="videos"
 output_dir="output"
 model_size="medium"
 language="Spanish"
-temperature="0.7"
-
-# Procesar los argumentos de la línea de comandos
-while getopts "i:o:m:l:t:h" opt; do
+while getopts "i:o:m:l:t:d:h" opt; do
     case ${opt} in
         i)
             input_dir=$OPTARG
@@ -41,6 +39,9 @@ while getopts "i:o:m:l:t:h" opt; do
         t)
             temperature=$OPTARG
             ;;
+        d)
+            download_id=$OPTARG
+            ;;
         h)
             usage
             ;;
@@ -50,18 +51,13 @@ while getopts "i:o:m:l:t:h" opt; do
     esac
 done
 
-# Comprobar la existencia de comandos necesarios
-for cmd in apt pip3 gdown whisper nvidia-smi; do
-    command -v $cmd >/dev/null 2>&1 || { echo "Error: El comando $cmd no está instalado."; exit 1; }
-done
-
 # Actualizar y mejorar el sistema
 echo "Actualizando y mejorando el sistema..."
 apt update && apt upgrade -y
 
 # Instalar herramientas necesarias
-echo "Instalando bashtop, nvtop, ffmpeg y unzip..."
-apt install -y bashtop nvtop ffmpeg unzip python3-venv
+echo "Instalando herramientas necesarias..."
+apt install -y bashtop nvtop ffmpeg unzip python3-venv bc
 
 # Crear y activar un entorno virtual de Python
 echo "Creando entorno virtual de Python..."
@@ -77,9 +73,24 @@ pip install gdown openai-whisper
 echo "Creando y moviéndose al directorio de entrada '$input_dir'..."
 mkdir -p "$input_dir" && cd "$input_dir"
 
-# Descargar un archivo zip que contiene los 100 archivos de video
-echo "Descargando archivos de video..."
-gdown 1WlRCDDJN8b1_HU50ygJ_zFT8xfmkdUcb --folder -O . || { echo "Error al descargar los videos."; exit 1; }
+# Descargar el archivo de video
+if [[ -n "$download_id" ]]; then
+    echo "Descargando archivo de video..."
+    gdown "$download_id" -O . || { echo "Error al descargar el video."; exit 1; }
+else
+    echo "Error: El ID de descarga no fue proporcionado."
+    exit 1
+fi
+
+# Verificar si solo hay un archivo y multiplicarlo por 10
+files=(*.mp4)
+if [ ${#files[@]} -eq 1 ]; then
+    echo "Solo se detectó un archivo. Multiplicando por 20..."
+    for i in {1..20}; do
+        cp "${files[0]}" "${files[0]%.mp4}_copy_$i.mp4"
+    done
+    files=(*_copy_*.mp4)
+fi
 
 # Descargar el modelo Whisper antes de usarlo
 echo "Descargando el modelo Whisper..."
@@ -87,7 +98,8 @@ python3 -c "import whisper; whisper.load_model('$model_size')" || { echo "Error 
 
 # Crear las carpetas de salida si no existen
 echo "Creando carpetas de salida..."
-mkdir -p "$output_dir/transcriptions" "$output_dir/times"
+mkdir -p "$output_dir/transcriptions"
+mkdir -p "$output_dir/times"
 
 # Contar el número de GPUs disponibles
 num_gpus=$(nvidia-smi -L | wc -l)
@@ -101,50 +113,67 @@ echo "Número de GPUs disponibles: $num_gpus"
 GPUS=($(seq 0 $((num_gpus - 1))))
 
 # Lista de archivos a procesar
-files=(*.mp4)
 num_files=${#files[@]}
+echo "Número de archivos a procesar: $num_files"
 
 # Función para procesar un archivo en una GPU
 process_file() {
     local gpu=$1
     local file=$2
+    local output_dir=$3
     
     echo "Procesando $file en GPU $gpu"
-    { time CUDA_VISIBLE_DEVICES=$gpu whisper "$file" --model $model_size --device cuda --language $language --output_dir "$output_dir/transcriptions" --fp16 True --temperature $temperature --task transcribe; } 2>> "$output_dir/times/time_${file%.mp4}.txt" || { echo "Error procesando el archivo $file en GPU $gpu"; }
+    
+    # Crear carpetas de salida si no existen
+    mkdir -p "$output_dir/transcriptions"
+    mkdir -p "$output_dir/times"
+    
+    # Obtener la duración del video en segundos
+    duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file")
+    echo "Duración del video: $duration segundos"
+    
+    # Iniciar temporizador
+    start=$(date +%s.%N)
+    
+    # Procesar el archivo
+    CUDA_VISIBLE_DEVICES=$gpu whisper "$file" --model $model_size --device cuda --language $language --output_dir "$output_dir/transcriptions" --fp16 True --temperature $temperature --task transcribe 2>> "$output_dir/times/time_${file%.mp4}.txt" || { echo "Error procesando el archivo $file en GPU $gpu"; }
+    
+    # Calcular tiempo total
+    end=$(date +%s.%N)
+    processing_time=$(echo "$end - $start" | bc || echo "bc no está disponible para cálculos de tiempo")
+    
+    # Agregar tiempo total y duración del video al archivo de tiempos
+    {
+        echo "Tiempo de procesamiento: $processing_time segundos"
+        echo "Duración del video: $duration segundos"
+    } >> "$output_dir/times/time_${file%.mp4}.txt"
 }
 
-# Función para controlar la cantidad de procesos concurrentes
-parallel_process() {
-    local max_jobs=$1
-    local current_jobs=0
+export -f process_file
+export model_size language temperature output_dir GPUS
 
-    shift
-    for cmd in "$@"; do
-        ((current_jobs++))
-        eval "$cmd" &
-        if ((current_jobs >= max_jobs)); then
-            wait -n
-            ((current_jobs--))
-        fi
-    done
-    wait
-}
+# Calcular el número de archivos a procesar simultáneamente por GPU
+files_per_gpu=$((num_files < num_gpus * 4 ? num_files / num_gpus : 4))
+if [[ $files_per_gpu -eq 0 ]]; then
+    files_per_gpu=1
+fi
+echo "Número de archivos a procesar simultáneamente por GPU: $files_per_gpu"
 
-# Procesar archivos en lotes, cada GPU procesa 2 archivos por ronda
+# Crear los comandos a ejecutar
 commands=()
-for ((i = 0; i < num_files; i += num_gpus * 2)); do
-    for ((j = 0; j < num_gpus; j++)); do
-        for ((k = 0; k < 2; k++)); do
-            index=$((i + j * 2 + k))
-            if [ $index -lt $num_files ]; then
-                commands+=("process_file '${GPUS[$j]}' '${files[$index]}'")
-            fi
-        done
-    done
+for ((i = 0; i < num_files; i++)); do
+    gpu_index=$((i / files_per_gpu % num_gpus))
+    commands+=("process_file ${GPUS[$gpu_index]} ${files[$i]} $output_dir")
 done
 
-# Ejecutar comandos en paralelo controlado
-parallel_process $num_gpus "${commands[@]}"
+# Mostrar comandos para depuración
+echo "Comandos a ejecutar:"
+for cmd in "${commands[@]}"; do
+    echo "$cmd"
+done
+
+# Ejecutar comandos en paralelo usando xargs
+printf "%s\n" "${commands[@]}" | xargs -P $((num_gpus * files_per_gpu)) -n 1 -I {} bash -c "{}"
 
 echo "Proceso completado."
 
